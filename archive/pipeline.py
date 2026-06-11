@@ -77,7 +77,35 @@ def process_video(video_id, store, vector_store, data_dir: Path):
 
     store.set_job(video_id, "finalize", "done")
     store.set_video_status(video_id, "done")
-    _emit(video_id, "finalize", "done", "처리 완료")
+    _emit(video_id, "finalize", "done", _summary(store, video_id))
+
+def _summary(store, video_id) -> str:
+    """완료 알림용 요약: 무슨 작업을 했고(자막·장면 수) 어떤 점이 있었는지(금칙·실패 단계)."""
+    video = store.get_video(video_id) or {}
+    name = video.get("filename", f"영상 {video_id}")
+    chunks = store.chunks_for_video(video_id)
+    n_tx = sum(1 for c in chunks if c["kind"] == "transcript")
+    n_sc = sum(1 for c in chunks if c["kind"] == "scene")
+    cats = {}
+    for c in chunks:
+        for f in store.flags_for_chunk(c["id"]):
+            cats[f["category"]] = cats.get(f["category"], 0) + 1
+    n_flags = sum(cats.values())
+    jobs = store.get_jobs(video_id)
+    failed = [s for s, j in jobs.items() if j.get("status") == "failed"]
+
+    lines = [f"✅ 「{name}」 처리 완료",
+             f"• 색인: 자막 {n_tx}개 · 장면 {n_sc}개 (총 {len(chunks)} 청크)"]
+    if n_flags:
+        top = ", ".join(f"{k} {v}" for k, v in
+                        sorted(cats.items(), key=lambda x: -x[1])[:4])
+        lines.append(f"• ⚑ 금칙 {n_flags}건 감지 ({top})")
+    else:
+        lines.append("• 금칙 감지 없음")
+    if failed:
+        lines.append(f"• ⚠️ 실패 단계: {', '.join(failed)} (가능한 범위까지 색인됨)")
+    lines.append("• 🔎 이제 검색 가능합니다")
+    return "\n".join(lines)
 
 def _analyze_frames(frames):
     out = []

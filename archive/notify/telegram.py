@@ -35,7 +35,8 @@ def subscribe_to_events():
     from archive.events import bus
     def on_event(e):
         if e.step == "finalize" and e.status == "done":
-            send_message(f"✅ [영상 {e.video_id}] 처리 완료")
+            # 파이프라인이 만든 요약(작업 내역·금칙·실패) 메시지를 그대로 전송
+            send_message(e.message or f"✅ [영상 {e.video_id}] 처리 완료")
     bus.subscribe(on_event)
 
 def handle_update(update, engine) -> None:
