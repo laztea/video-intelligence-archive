@@ -1,6 +1,9 @@
 # archive/search/engine.py
+import re
 from archive import config
 from archive.search.explain import build_explanation
+
+_TOK = re.compile(r"[0-9A-Za-z가-힣]+")
 
 def _minmax(scores: dict) -> dict:
     if not scores:
@@ -17,20 +20,34 @@ class SearchEngine:
         self.vec = vector_store
         self.embed_fn = embed_fn
 
-    def search(self, query, mode="hybrid", filters=None, limit=20):
+    def search(self, query, mode="hybrid", filters=None, limit=20, keyword_query=None):
+        """query: 의미(벡터) 검색용 문장.  keyword_query: FTS 키워드 검색용 어휘
+        (없으면 query 사용). 분리해 두면 hybrid에서 벡터는 문장, 키워드는 추출
+        어휘를 쓸 수 있다."""
         filters = filters or {}
         if mode == "filter":
             return self._filter(filters, limit)
-        kw = self._keyword_scores(query, limit) if mode in ("keyword", "hybrid") else {}
+        kwq = keyword_query if keyword_query is not None else query
+        kw = self._keyword_scores(kwq, limit) if mode in ("keyword", "hybrid") else {}
         vec = self._vector_scores(query, limit, filters) if mode in ("vector", "hybrid") else {}
-        return self._assemble(kw, vec, mode, limit, query)
+        return self._assemble(kw, vec, mode, limit)
 
     def _keyword_scores(self, query, limit):
         if not query:
             return {}
-        hits = self.sql.fts_search(query, limit=limit)
-        # bm25는 낮을수록 좋음 → 부호 반전해 점수화
-        return {h["id"]: {"row": h, "bm25": h["bm25"], "raw": -h["bm25"]} for h in hits}
+        terms = list(dict.fromkeys(_TOK.findall(query)))  # 중복 제거, 순서 유지
+        # OR 검색으로 후보를 넉넉히 뽑은 뒤 coverage(매칭 키워드 수)로 재랭킹
+        hits = self.sql.fts_search(query, limit=max(limit * 3, 30))
+        out = {}
+        for h in hits:
+            text = (h["text"] or "").lower()
+            matched = [t for t in terms if t.lower() in text]
+            coverage = len(matched)
+            # 매칭 키워드 수 우선, 동률이면 bm25(낮을수록 좋음 → 빼서 가산)
+            raw = coverage * 100.0 - (h["bm25"] or 0.0)
+            out[h["id"]] = {"bm25": h["bm25"], "raw": raw,
+                            "matched": matched, "coverage": coverage}
+        return out
 
     def _vector_scores(self, query, limit, filters):
         if not query:
@@ -44,7 +61,7 @@ class SearchEngine:
             out[h["chunk_id"]] = {"sim": sim, "raw": sim}
         return out
 
-    def _assemble(self, kw, vec, mode, limit, query=""):
+    def _assemble(self, kw, vec, mode, limit):
         alpha = config.hybrid_alpha()
         kw_norm = _minmax({k: v["raw"] for k, v in kw.items()})
         vec_norm = _minmax({k: v["raw"] for k, v in vec.items()})
@@ -62,26 +79,13 @@ class SearchEngine:
             row = self.sql.get_chunk(cid)
             if not row:
                 continue
-            matched = self._matched_terms(row["text"], query) if cid in kw else []
             expl = build_explanation(
-                matched_terms=matched,
+                matched_terms=kw[cid]["matched"] if cid in kw else [],
                 bm25=kw[cid]["bm25"] if cid in kw else None,
                 similarity=vec[cid]["sim"] if cid in vec else None)
             results.append(self._format(row, score, expl))
         results.sort(key=lambda r: r["score"], reverse=True)
         return results[:limit]
-
-    def _matched_terms(self, text, query):
-        """쿼리에서 실제로 본문에 등장하는 어구만 반환 (설명용)."""
-        if not query:
-            return []
-        low = text.lower()
-        terms = [t for t in query.split() if t]
-        present = [t for t in terms if t.lower() in low]
-        # 공백 없는 단일 쿼리("무지개")가 부분일치한 경우도 표기
-        if not present and query.lower() in low:
-            present = [query]
-        return present
 
     def _filter(self, filters, limit):
         clauses, params = [], []

@@ -59,10 +59,17 @@ def search(q: str = "", mode: str = "hybrid", kind: str = None, flagged: bool = 
     filters = {}
     if kind: filters["kind"] = kind
     if flagged: filters["flagged"] = True
-    parsed = decompose(q) if mode in ("hybrid", "vector") and q else {
-        "semantic_query": q, "keywords": [q], "filters": {}}
-    filters = {**parsed.get("filters", {}), **filters}
-    results = get_engine().search(parsed["semantic_query"], mode=mode, filters=filters)
+    if mode in ("hybrid", "vector") and q:
+        parsed = decompose(q)
+        semantic = parsed.get("semantic_query") or q
+        # 키워드 검색은 GPT가 추출·확장한 키워드(유의어 포함)를 쓴다 (문장 X)
+        keyword_query = " ".join(parsed.get("keywords") or [q])
+        filters = {**parsed.get("filters", {}), **filters}
+    else:
+        semantic = q
+        keyword_query = q
+    results = get_engine().search(semantic, mode=mode, filters=filters,
+                                  keyword_query=keyword_query)
     return JSONResponse(results)
 
 @app.get("/videos")
@@ -115,6 +122,22 @@ def thumb(video_id: int):
     if not frames:
         raise HTTPException(404, "no thumbnail")
     return FileResponse(frames[0], media_type="image/jpeg")
+
+@app.get("/frame/{chunk_id}")
+def chunk_frame(chunk_id: int):
+    """검색 결과 썸네일: scene 청크는 자기 keyframe, 그 외엔 영상 첫 프레임."""
+    store = get_store()
+    c = store.get_chunk(chunk_id)
+    if not c:
+        raise HTTPException(404, "chunk not found")
+    fp = c.get("frame_path")
+    if fp and Path(fp).exists():
+        return FileResponse(fp, media_type="image/jpeg")
+    frames_dir = config.data_dir() / "frames" / str(c["video_id"])
+    frames = sorted(frames_dir.glob("*.jpg")) if frames_dir.exists() else []
+    if frames:
+        return FileResponse(frames[0], media_type="image/jpeg")
+    raise HTTPException(404, "no frame")
 
 @app.get("/progress/{video_id}")
 async def progress(video_id: int):
