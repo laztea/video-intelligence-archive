@@ -1,48 +1,562 @@
-<!-- archive/web/static/index.html -->
-<!doctype html><html lang="ko"><head><meta charset="utf-8">
-<title>영상 아카이브</title>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>아카이브 — 영상 인덱스 & 설명 가능한 검색</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=Spline+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
- body{font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem}
- .badge{font-size:.75rem;padding:.1rem .4rem;border-radius:.3rem;color:#fff}
- .both{background:#7c3aed}.keyword{background:#2563eb}.vector{background:#059669}
- .filter{background:#64748b}
- .result{border:1px solid #e2e8f0;border-radius:.5rem;padding:.8rem;margin:.5rem 0}
- .expl{color:#64748b;font-size:.85rem;margin-top:.3rem}
- progress{width:100%}
-</style></head><body>
-<h1>영상 아카이브 업로드</h1>
-<input type="file" id="file" accept="video/*">
-<button onclick="upload()">업로드</button>
-<progress id="bar" max="10" value="0" hidden></progress>
-<div id="status"></div>
-<hr>
-<h2>검색</h2>
-<input id="q" placeholder="자연어로 검색..." size="40">
-<select id="mode"><option>hybrid</option><option>keyword</option>
- <option>vector</option><option>filter</option></select>
-<button onclick="search()">검색</button>
-<div id="results"></div>
+:root{
+  --bg:#14110d; --bg2:#1a1611; --surface:#1f1a13; --surface2:#262019;
+  --line:#352b1e; --line2:#473a28;
+  --ink:#ece3d4; --muted:#a2937b; --faint:#6f6353;
+  --amber:#e6a73f; --amber-dim:#8a6a2c;
+  --teal:#5fb8a8; --teal-dim:#356b62;
+  --rose:#d98aa6; --rose-dim:#7d4f5f;
+  --slate:#8aa0b4; --slate-dim:#4d5d6b;
+  --flag:#df6a4a;
+  --radius:14px;
+  --shadow:0 18px 50px -22px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:
+    radial-gradient(120% 80% at 85% -10%, rgba(230,167,63,.10), transparent 55%),
+    radial-gradient(90% 60% at -5% 110%, rgba(95,184,168,.07), transparent 50%),
+    var(--bg);
+  color:var(--ink);
+  font-family:"Spline Sans",-apple-system,sans-serif;
+  font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+/* film grain */
+body::after{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:9999; opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+::selection{background:var(--amber);color:#1a1206}
+button{font-family:inherit;cursor:pointer;color:inherit}
+input,select{font-family:inherit}
+a{color:inherit}
+
+/* ---------- header ---------- */
+header{
+  position:sticky; top:0; z-index:50;
+  backdrop-filter:blur(14px);
+  background:linear-gradient(var(--bg) 30%, rgba(20,17,13,.72));
+  border-bottom:1px solid var(--line);
+}
+.bar{
+  max-width:1180px; margin:0 auto; padding:18px 28px;
+  display:grid; grid-template-columns:auto 1fr auto; gap:24px; align-items:center;
+}
+.brand{display:flex; align-items:baseline; gap:11px; cursor:pointer; user-select:none}
+.brand .mark{
+  font-family:"Fraunces",serif; font-weight:900; font-size:27px; letter-spacing:-.02em;
+  line-height:1;
+}
+.brand .mark em{font-style:italic; color:var(--amber); font-weight:500}
+.brand .sub{
+  font-family:"JetBrains Mono",monospace; font-size:9.5px; letter-spacing:.34em;
+  color:var(--faint); text-transform:uppercase; padding-bottom:2px;
+}
+
+/* search box */
+.searchwrap{position:relative}
+.searchwrap svg{position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--faint)}
+#q{
+  width:100%; padding:13px 16px 13px 44px;
+  background:var(--surface); border:1px solid var(--line2); border-radius:11px;
+  color:var(--ink); font-size:15px; outline:none; transition:.18s border,.18s box-shadow;
+}
+#q::placeholder{color:var(--faint)}
+#q:focus{border-color:var(--amber-dim); box-shadow:0 0 0 3px rgba(230,167,63,.12)}
+kbd{
+  position:absolute; right:14px; top:50%; transform:translateY(-50%);
+  font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--faint);
+  border:1px solid var(--line2); border-radius:5px; padding:2px 6px; background:var(--bg2);
+}
+.upbtn{
+  display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+  padding:12px 18px; border-radius:11px; border:1px solid var(--amber-dim);
+  background:linear-gradient(180deg, rgba(230,167,63,.16), rgba(230,167,63,.06));
+  color:var(--amber); font-weight:600; font-size:14px; transition:.16s transform,.16s background;
+}
+.upbtn:hover{transform:translateY(-1px); background:rgba(230,167,63,.2)}
+
+/* controls row */
+.controls{
+  max-width:1180px; margin:0 auto; padding:0 28px 16px;
+  display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+}
+.pills{display:flex; gap:4px; background:var(--bg2); border:1px solid var(--line); border-radius:10px; padding:4px}
+.pill{
+  padding:7px 14px; border-radius:7px; border:none; background:transparent;
+  color:var(--muted); font-size:12.5px; font-weight:500; letter-spacing:.02em; transition:.15s;
+  font-family:"JetBrains Mono",monospace;
+}
+.pill.on{background:var(--surface2); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line2)}
+.pill:hover:not(.on){color:var(--ink)}
+.ctl-sep{width:1px; height:22px; background:var(--line); margin:0 4px}
+select.filter{
+  padding:8px 12px; background:var(--bg2); border:1px solid var(--line);
+  border-radius:9px; color:var(--muted); font-size:12.5px;
+  font-family:"JetBrains Mono",monospace;
+}
+.toggle{
+  display:inline-flex; align-items:center; gap:8px; padding:8px 13px;
+  background:var(--bg2); border:1px solid var(--line); border-radius:9px;
+  color:var(--muted); font-size:12.5px; font-family:"JetBrains Mono",monospace; user-select:none;
+}
+.toggle.on{color:var(--flag); border-color:var(--rose-dim)}
+.toggle .dot{width:8px;height:8px;border-radius:50%;background:var(--line2)}
+.toggle.on .dot{background:var(--flag); box-shadow:0 0 8px var(--flag)}
+
+/* ---------- main ---------- */
+main{max-width:1180px; margin:0 auto; padding:30px 28px 90px}
+.eyebrow{
+  font-family:"JetBrains Mono",monospace; font-size:11px; letter-spacing:.28em;
+  text-transform:uppercase; color:var(--faint); display:flex; align-items:center; gap:12px;
+  margin-bottom:22px;
+}
+.eyebrow::after{content:""; flex:1; height:1px; background:var(--line)}
+.eyebrow b{color:var(--amber); font-weight:700}
+
+/* dropzone */
+.dropzone{
+  border:1.5px dashed var(--line2); border-radius:var(--radius);
+  padding:26px; text-align:center; color:var(--muted); margin-bottom:34px;
+  transition:.18s; background:linear-gradient(180deg, rgba(255,255,255,.012), transparent);
+}
+.dropzone.drag{border-color:var(--amber); background:rgba(230,167,63,.07); color:var(--ink)}
+.dropzone h3{margin:0 0 4px; font-family:"Fraunces",serif; font-weight:600; font-size:19px; color:var(--ink)}
+.dropzone p{margin:0; font-size:13px}
+.dropzone .di{font-size:26px; margin-bottom:6px; opacity:.7}
+
+/* upload progress rows */
+#uploads{display:flex; flex-direction:column; gap:10px; margin-bottom:34px}
+.up{
+  background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px;
+  animation:rise .4s both; overflow:hidden;
+}
+.up .top{display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:9px}
+.up .name{font-weight:500; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.up .step{font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--amber); white-space:nowrap}
+.up .step.done{color:var(--teal)} .up .step.failed{color:var(--flag)}
+.track{height:5px; border-radius:3px; background:var(--bg); overflow:hidden}
+.track i{display:block; height:100%; width:0; border-radius:3px;
+  background:linear-gradient(90deg,var(--amber-dim),var(--amber)); transition:width .5s ease}
+.up.ok .track i{background:linear-gradient(90deg,var(--teal-dim),var(--teal))}
+.up.err .track i{background:var(--flag)}
+
+/* video grid */
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(248px,1fr)); gap:18px}
+.card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  overflow:hidden; cursor:pointer; transition:.2s transform,.2s border-color,.2s box-shadow;
+  animation:rise .5s both;
+}
+.card:hover{transform:translateY(-3px); border-color:var(--line2); box-shadow:var(--shadow)}
+.thumb{
+  aspect-ratio:16/10; background:var(--bg2) center/cover no-repeat; position:relative;
+  display:flex; align-items:center; justify-content:center;
+  border-bottom:1px solid var(--line);
+}
+.thumb .ph{font-family:"Fraunces",serif; font-style:italic; color:var(--faint); font-size:15px}
+.thumb .play{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  background:rgba(20,17,13,.35); opacity:0; transition:.2s;
+}
+.card:hover .thumb .play{opacity:1}
+.thumb .play span{
+  width:46px; height:46px; border-radius:50%; background:rgba(230,167,63,.92); color:#1a1206;
+  display:flex; align-items:center; justify-content:center; font-size:17px; padding-left:3px;
+}
+.status{
+  position:absolute; top:10px; left:10px; font-family:"JetBrains Mono",monospace;
+  font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding:4px 8px; border-radius:6px;
+  background:rgba(20,17,13,.78); backdrop-filter:blur(4px);
+}
+.status.done{color:var(--teal)} .status.processing{color:var(--amber)} .status.failed{color:var(--flag)}
+.status.processing .blink{animation:blink 1s infinite}
+.flagchip{
+  position:absolute; top:10px; right:10px; font-family:"JetBrains Mono",monospace;
+  font-size:10px; padding:4px 8px; border-radius:6px; color:var(--flag);
+  background:rgba(223,106,74,.14); border:1px solid var(--rose-dim);
+}
+.card .meta{padding:13px 15px 15px}
+.card .ttl{font-weight:500; font-size:14.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.card .stat{
+  display:flex; gap:14px; margin-top:9px; font-family:"JetBrains Mono",monospace;
+  font-size:11.5px; color:var(--muted);
+}
+.card .stat b{color:var(--ink); font-weight:700}
+
+/* ---------- search results ---------- */
+.results{display:flex; flex-direction:column; gap:13px}
+.res{
+  display:grid; grid-template-columns:auto 1fr; gap:18px;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:18px 20px; cursor:pointer; transition:.18s; animation:rise .45s both;
+  border-left:3px solid var(--line2);
+}
+.res:hover{border-color:var(--line2); background:var(--surface2); transform:translateX(2px)}
+.res.s-keyword{border-left-color:var(--amber)} .res.s-vector{border-left-color:var(--teal)}
+.res.s-both{border-left-color:var(--rose)} .res.s-filter{border-left-color:var(--slate)}
+.res .ts{
+  font-family:"JetBrains Mono",monospace; text-align:center; min-width:62px; padding-top:2px;
+}
+.res .ts .t{font-size:18px; font-weight:700; color:var(--ink)}
+.res .ts .k{font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); margin-top:3px}
+.res .body .head{display:flex; align-items:center; gap:10px; margin-bottom:7px; flex-wrap:wrap}
+.badge{
+  font-family:"JetBrains Mono",monospace; font-size:10.5px; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; padding:3px 9px; border-radius:6px;
+}
+.badge.keyword{color:var(--amber); background:rgba(230,167,63,.13); box-shadow:inset 0 0 0 1px var(--amber-dim)}
+.badge.vector{color:var(--teal); background:rgba(95,184,168,.13); box-shadow:inset 0 0 0 1px var(--teal-dim)}
+.badge.both{color:var(--rose); background:rgba(217,138,166,.14); box-shadow:inset 0 0 0 1px var(--rose-dim)}
+.badge.filter{color:var(--slate); background:rgba(138,160,180,.13); box-shadow:inset 0 0 0 1px var(--slate-dim)}
+.res .fname{font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--muted)}
+.res .score{margin-left:auto; font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--faint)}
+.res .text{font-size:15px; line-height:1.55; color:var(--ink)}
+.res .why{
+  margin-top:10px; padding:9px 12px; border-radius:8px; background:var(--bg2);
+  font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--muted);
+  display:flex; gap:9px; align-items:flex-start; border:1px solid var(--line);
+}
+.res .why .lbl{color:var(--faint); flex-shrink:0}
+.res .flags{display:flex; gap:6px; margin-top:9px; flex-wrap:wrap}
+.fbadge{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--flag);
+  background:rgba(223,106,74,.12); border:1px solid var(--rose-dim); padding:2px 8px; border-radius:5px}
+
+/* ---------- detail ---------- */
+.back{
+  display:inline-flex; align-items:center; gap:8px; color:var(--muted); background:none; border:none;
+  font-size:13px; margin-bottom:18px; font-family:"JetBrains Mono",monospace; transition:.15s color;
+}
+.back:hover{color:var(--amber)}
+.detail{display:grid; grid-template-columns:1.35fr 1fr; gap:26px; align-items:start}
+.player{position:sticky; top:108px}
+.player video{width:100%; border-radius:var(--radius); background:#000; border:1px solid var(--line); display:block}
+.player h2{font-family:"Fraunces",serif; font-weight:600; font-size:23px; margin:16px 0 6px; line-height:1.2}
+.player .dmeta{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--muted); display:flex; gap:16px; flex-wrap:wrap}
+.timeline{display:flex; flex-direction:column; gap:7px; max-height:72vh; overflow:auto; padding-right:6px}
+.timeline::-webkit-scrollbar{width:8px}
+.timeline::-webkit-scrollbar-thumb{background:var(--line2); border-radius:4px}
+.seg{
+  display:grid; grid-template-columns:auto 1fr; gap:13px; padding:11px 13px;
+  background:var(--surface); border:1px solid var(--line); border-radius:10px; cursor:pointer;
+  border-left:3px solid var(--line2); transition:.15s;
+}
+.seg:hover{background:var(--surface2); border-left-color:var(--amber)}
+.seg.scene{border-left-color:var(--teal-dim)}
+.seg .tc{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--amber); padding-top:1px; min-width:48px}
+.seg.scene .tc{color:var(--teal)}
+.seg .kind{font-family:"JetBrains Mono",monospace; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); margin-bottom:3px}
+.seg .stext{font-size:13.5px; line-height:1.5}
+.seg .sflags{display:flex; gap:5px; margin-top:6px; flex-wrap:wrap}
+
+/* empty / loading */
+.empty{text-align:center; padding:80px 20px; color:var(--muted)}
+.empty .big{font-family:"Fraunces",serif; font-style:italic; font-size:30px; color:var(--faint); margin-bottom:10px}
+.empty p{font-size:14px}
+.spinner{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--amber);border-radius:50%;
+  animation:spin .8s linear infinite; margin:60px auto}
+
+/* toast */
+#toasts{position:fixed; bottom:24px; right:24px; z-index:200; display:flex; flex-direction:column; gap:10px}
+.toast{
+  background:var(--surface2); border:1px solid var(--line2); border-left:3px solid var(--teal);
+  border-radius:10px; padding:13px 17px; box-shadow:var(--shadow); animation:rise .35s both;
+  font-size:13.5px; max-width:320px;
+}
+.toast.err{border-left-color:var(--flag)}
+.toast b{font-family:"Fraunces",serif}
+
+@keyframes rise{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blink{50%{opacity:.3}}
+.hidden{display:none!important}
+@media(max-width:820px){
+  .bar{grid-template-columns:1fr auto; gap:14px} .searchwrap{grid-column:1/-1; order:3}
+  .detail{grid-template-columns:1fr} .player{position:static}
+  kbd{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand" onclick="go('archive')">
+      <span class="mark">아카이브<em>.</em></span>
+      <span class="sub">video&nbsp;intelligence</span>
+    </div>
+    <div class="searchwrap">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+      <input id="q" placeholder="자연어로 검색…  예: 무지개색 테스트 패턴이 나오는 장면" autocomplete="off">
+      <kbd>/</kbd>
+    </div>
+    <button class="upbtn" onclick="document.getElementById('file').click()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V6m0 0-6 6m6-6 6 6"/></svg>
+      업로드
+    </button>
+  </div>
+  <div class="controls" id="searchControls">
+    <div class="pills" id="modePills">
+      <button class="pill on" data-mode="hybrid">hybrid</button>
+      <button class="pill" data-mode="keyword">keyword</button>
+      <button class="pill" data-mode="vector">vector</button>
+      <button class="pill" data-mode="filter">filter</button>
+    </div>
+    <div class="ctl-sep"></div>
+    <select class="filter" id="kindFilter">
+      <option value="">전체 종류</option>
+      <option value="transcript">자막 (transcript)</option>
+      <option value="scene">장면 (scene)</option>
+    </select>
+    <div class="toggle" id="flagToggle"><span class="dot"></span> 금칙만</div>
+  </div>
+</header>
+
+<input type="file" id="file" accept="video/*" multiple class="hidden">
+
+<main id="main"></main>
+<div id="toasts"></div>
+
 <script>
-const STEPS=["audio","transcribe","subtitle","keyframes","vision","embed","finalize"];
-async function upload(){
- const f=document.getElementById('file').files[0]; if(!f)return;
- const fd=new FormData(); fd.append('file',f);
- const r=await fetch('/upload',{method:'POST',body:fd});
- const {video_id}=await r.json();
- const bar=document.getElementById('bar'); bar.hidden=false; bar.value=0;
- const es=new EventSource(`/progress/${video_id}`);
- es.onmessage=e=>{const d=JSON.parse(e.data);
-  bar.value=STEPS.indexOf(d.step)+1;
-  document.getElementById('status').textContent=`${d.step}: ${d.status} ${d.message||''}`;
-  if(d.step==='finalize'&&d.status==='done')es.close();};
+const STEPS = ["audio","transcribe","subtitle","keyframes","vision","embed","finalize"];
+const STEP_KO = {audio:"오디오 추출",transcribe:"음성 인식",subtitle:"자막 교정",
+  keyframes:"장면 추출",vision:"장면 분석",embed:"임베딩",finalize:"마무리"};
+const state = { view:"archive", mode:"hybrid", kind:"", flagged:false, _seek:null };
+const $ = s => document.querySelector(s);
+const main = $("#main");
+
+const fmtTime = s => { s=Math.max(0,Math.round(s||0)); const m=Math.floor(s/60); return `${m}:${String(s%60).padStart(2,"0")}`; };
+const esc = t => (t||"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+/* ---------------- routing ---------------- */
+function go(view, arg){
+  state.view = view;
+  $("#searchControls").classList.toggle("hidden", view!=="search" && view!=="archive");
+  if(view==="archive") renderArchive();
+  else if(view==="search") runSearch();
+  else if(view==="detail") renderDetail(arg);
 }
-async function search(){
- const q=document.getElementById('q').value, mode=document.getElementById('mode').value;
- const r=await fetch(`/search?q=${encodeURIComponent(q)}&mode=${mode}`);
- const data=await r.json();
- document.getElementById('results').innerHTML=data.map(x=>`
-  <div class="result"><span class="badge ${x.source}">${x.source}</span>
-   <b> [영상 ${x.video_id} @${x.start_s.toFixed(0)}s]</b> ${x.text}
-   <div class="expl">↳ ${x.explanation.text}</div></div>`).join('')||'결과 없음';
+
+/* ---------------- archive ---------------- */
+async function renderArchive(){
+  main.innerHTML = `
+    <div class="dropzone" id="dz">
+      <div class="di">⊕</div>
+      <h3>영상을 여기에 끌어다 놓으세요</h3>
+      <p>또는 우측 상단 <b>업로드</b> 버튼 · 여러 개 한 번에 가능 · 업로드 즉시 색인 시작</p>
+    </div>
+    <div id="uploads"></div>
+    <div class="eyebrow">아카이브 <b id="vcount"></b></div>
+    <div id="archiveBody"><div class="spinner"></div></div>`;
+  wireDropzone();
+  flushUploadsInto($("#uploads"));
+  let vids=[];
+  try{ vids = await (await fetch("/videos")).json(); }catch(e){}
+  $("#vcount").textContent = vids.length ? `${vids.length}편` : "";
+  const body = $("#archiveBody");
+  if(!vids.length){
+    body.innerHTML = `<div class="empty"><div class="big">아직 비어 있어요</div>
+      <p>첫 영상을 업로드하면 AI가 듣고·보고 색인해 검색 가능한 아카이브가 됩니다.</p></div>`;
+    return;
+  }
+  body.className="grid";
+  body.innerHTML = vids.map((v,i)=>cardHTML(v,i)).join("");
 }
-</script></body></html>
+function cardHTML(v,i){
+  const st = v.status||"pending";
+  const hasThumb = v.scene_count>0;
+  return `<div class="card" style="animation-delay:${i*40}ms" onclick="go('detail',${v.id})">
+    <div class="thumb" ${hasThumb?`style="background-image:url(/thumb/${v.id})"`:""}>
+      ${hasThumb?"":'<span class="ph">no preview</span>'}
+      <div class="status ${st}">${st==="processing"?'<span class="blink">●</span> ':""}${st}</div>
+      ${v.flag_count?`<div class="flagchip">⚑ ${v.flag_count}</div>`:""}
+      <div class="play"><span>▶</span></div>
+    </div>
+    <div class="meta">
+      <div class="ttl">${esc(v.filename)}</div>
+      <div class="stat">
+        <span><b>${v.chunk_count}</b> 청크</span>
+        <span><b>${v.transcript_count}</b> 자막</span>
+        <span><b>${v.scene_count}</b> 장면</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- search ---------------- */
+let searchTimer;
+function debouncedSearch(){ clearTimeout(searchTimer); searchTimer=setTimeout(()=>{ if(state.view!=="search") go("search"); else runSearch(); },280); }
+async function runSearch(){
+  const q = $("#q").value.trim();
+  if(!q && state.mode!=="filter" && !state.flagged && !state.kind){ go("archive"); return; }
+  main.innerHTML = `<div class="eyebrow">검색 결과 · <b>${state.mode}</b></div><div class="spinner"></div>`;
+  const params = new URLSearchParams({q, mode:state.mode});
+  if(state.kind) params.set("kind",state.kind);
+  if(state.flagged) params.set("flagged","true");
+  let res=[];
+  try{ res = await (await fetch("/search?"+params)).json(); }catch(e){}
+  const vids = await videoMap();
+  const head = `<div class="eyebrow">검색 결과 · <b>${state.mode}</b> · ${res.length}건</div>`;
+  if(!res.length){
+    main.innerHTML = head + `<div class="empty"><div class="big">결과 없음</div>
+      <p>다른 검색어나 모드(hybrid·keyword·vector)를 시도해 보세요. 한글 키워드는 3글자 이상이 정확합니다.</p></div>`;
+    return;
+  }
+  main.innerHTML = head + `<div class="results">${res.map((r,i)=>resHTML(r,vids,i)).join("")}</div>`;
+}
+function resHTML(r,vids,i){
+  const src = r.source||"filter";
+  const fname = vids[r.video_id]?.filename || `영상 ${r.video_id}`;
+  const score = (r.score!=null)? `score ${r.score.toFixed(2)}` : "";
+  const flags = (r.flags||[]).map(f=>`<span class="fbadge">⚑ ${esc(f.category)}·${esc(f.severity)}</span>`).join("");
+  return `<div class="res s-${src}" style="animation-delay:${i*45}ms" onclick="openAt(${r.video_id},${r.start_s})">
+    <div class="ts"><div class="t">${fmtTime(r.start_s)}</div><div class="k">${r.kind==="scene"?"장면":"자막"}</div></div>
+    <div class="body">
+      <div class="head">
+        <span class="badge ${src}">${src}</span>
+        <span class="fname">${esc(fname)}</span>
+        <span class="score">${score}</span>
+      </div>
+      <div class="text">${esc(r.text)}</div>
+      ${flags?`<div class="flags">${flags}</div>`:""}
+      <div class="why"><span class="lbl">WHY</span><span>${esc(r.explanation?.text||"")}</span></div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- detail ---------------- */
+let _vmap;
+async function videoMap(){
+  if(_vmap) return _vmap;
+  try{ const vs = await (await fetch("/videos")).json(); _vmap = Object.fromEntries(vs.map(v=>[v.id,v])); }
+  catch(e){ _vmap={}; }
+  return _vmap;
+}
+async function renderDetail(id){
+  main.innerHTML = `<button class="back" onclick="go('archive')">← 아카이브로</button><div class="spinner"></div>`;
+  let d;
+  try{ d = await (await fetch("/video/"+id)).json(); }catch(e){ main.innerHTML+="<div class='empty'>불러올 수 없음</div>"; return; }
+  const v=d.video, chunks=(d.chunks||[]).slice().sort((a,b)=>a.start_s-b.start_s);
+  const flagN = chunks.reduce((n,c)=>n+(c.flags?.length||0),0);
+  main.innerHTML = `
+    <button class="back" onclick="go('archive')">← 아카이브로</button>
+    <div class="detail">
+      <div class="player">
+        <video id="vid" controls preload="metadata" src="/media/${v.id}"></video>
+        <h2>${esc(v.filename)}</h2>
+        <div class="dmeta">
+          <span>상태 · ${v.status}</span>
+          <span>${chunks.length} 청크</span>
+          ${flagN?`<span style="color:var(--flag)">⚑ 금칙 ${flagN}</span>`:""}
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow">타임라인 · 클릭하면 그 지점부터 재생</div>
+        <div class="timeline">
+          ${chunks.length? chunks.map(c=>segHTML(c)).join("") :
+            "<div class='empty' style='padding:40px'><p>색인된 청크가 없습니다.</p></div>"}
+        </div>
+      </div>
+    </div>`;
+  if(state._seek!=null){ const vd=$("#vid"); vd.addEventListener("loadedmetadata",()=>{vd.currentTime=state._seek; vd.play().catch(()=>{}); state._seek=null;},{once:true}); }
+}
+function segHTML(c){
+  const flags=(c.flags||[]).map(f=>`<span class="fbadge">⚑ ${esc(f.category)}</span>`).join("");
+  return `<div class="seg ${c.kind}" onclick="seekVid(${c.start_s})">
+    <div class="tc">${fmtTime(c.start_s)}</div>
+    <div>
+      <div class="kind">${c.kind==="scene"?"장면 · vision":"자막 · transcript"}</div>
+      <div class="stext">${esc(c.text)}</div>
+      ${flags?`<div class="sflags">${flags}</div>`:""}
+    </div>
+  </div>`;
+}
+function seekVid(t){ const v=$("#vid"); if(v){ v.currentTime=t; v.play().catch(()=>{}); window.scrollTo({top:0,behavior:"smooth"}); } }
+function openAt(id,t){ state._seek=t; go("detail",id); }
+
+/* ---------------- upload ---------------- */
+const liveUploads = []; // {el}
+function wireDropzone(){
+  const dz=$("#dz"); if(!dz) return;
+  ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag")}));
+  ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag")}));
+  dz.addEventListener("drop",e=>handleFiles(e.dataTransfer.files));
+  dz.addEventListener("click",()=>$("#file").click());
+}
+$("#file").addEventListener("change",e=>{ handleFiles(e.target.files); e.target.value=""; });
+function flushUploadsInto(box){ liveUploads.forEach(u=>box.appendChild(u.el)); }
+
+function handleFiles(files){
+  if(state.view!=="archive"){ go("archive"); setTimeout(()=>doUpload(files),60); }
+  else doUpload(files);
+}
+function doUpload(files){
+  for(const f of files){ if(f.type.startsWith("video/")||/\.(mp4|mov|mkv|webm|avi)$/i.test(f.name)) uploadOne(f); }
+}
+function uploadOne(file){
+  const el=document.createElement("div"); el.className="up";
+  el.innerHTML=`<div class="top"><span class="name">${esc(file.name)}</span><span class="step">업로드 중…</span></div>
+    <div class="track"><i></i></div>`;
+  const box=$("#uploads"); if(box) box.prepend(el);
+  const rec={el}; liveUploads.unshift(rec);
+  const stepEl=el.querySelector(".step"), barEl=el.querySelector(".track i");
+  const fd=new FormData(); fd.append("file",file);
+  fetch("/upload",{method:"POST",body:fd}).then(r=>r.json()).then(({video_id})=>{
+    const es=new EventSource(`/progress/${video_id}`);
+    es.onmessage=e=>{
+      const d=JSON.parse(e.data);
+      const idx=STEPS.indexOf(d.step);
+      if(idx>=0) barEl.style.width=((idx+1)/STEPS.length*100)+"%";
+      stepEl.textContent=`${STEP_KO[d.step]||d.step} · ${d.status}`;
+      if(d.status==="failed") stepEl.classList.add("failed");
+      if(d.step==="finalize"&&d.status==="done"){
+        es.close(); el.classList.add("ok"); barEl.style.width="100%";
+        stepEl.textContent="완료 ✓"; stepEl.className="step done";
+        toast(`<b>${esc(file.name)}</b> 색인 완료`); _vmap=null;
+        setTimeout(()=>{ const i=liveUploads.indexOf(rec); if(i>=0)liveUploads.splice(i,1);
+          el.style.transition=".4s"; el.style.opacity="0"; el.style.maxHeight="0"; el.style.padding="0"; el.style.marginBottom="0";
+          setTimeout(()=>el.remove(),400); if(state.view==="archive")renderArchive(); },2600);
+      }
+    };
+    es.onerror=()=>es.close();
+  }).catch(()=>{ el.classList.add("err"); stepEl.textContent="업로드 실패"; stepEl.classList.add("failed"); toast(`<b>${esc(file.name)}</b> 업로드 실패`,true); });
+}
+
+/* ---------------- toasts ---------------- */
+function toast(html,err){
+  const t=document.createElement("div"); t.className="toast"+(err?" err":""); t.innerHTML=html;
+  $("#toasts").appendChild(t);
+  setTimeout(()=>{ t.style.transition=".4s"; t.style.opacity="0"; t.style.transform="translateX(20px)"; setTimeout(()=>t.remove(),400); },3600);
+}
+
+/* ---------------- wire controls ---------------- */
+$("#q").addEventListener("input",debouncedSearch);
+$("#q").addEventListener("keydown",e=>{ if(e.key==="Enter"){clearTimeout(searchTimer); go("search");} if(e.key==="Escape"){e.target.value="";go("archive");} });
+$("#modePills").addEventListener("click",e=>{
+  const b=e.target.closest(".pill"); if(!b)return;
+  document.querySelectorAll("#modePills .pill").forEach(p=>p.classList.remove("on"));
+  b.classList.add("on"); state.mode=b.dataset.mode;
+  if($("#q").value.trim()||state.mode==="filter"||state.flagged) go("search");
+});
+$("#kindFilter").addEventListener("change",e=>{ state.kind=e.target.value; if(state.view==="search"||state.kind) go("search"); });
+$("#flagToggle").addEventListener("click",e=>{
+  state.flagged=!state.flagged; e.currentTarget.classList.toggle("on",state.flagged);
+  go("search");
+});
+document.addEventListener("keydown",e=>{ if(e.key==="/"&&document.activeElement!==$("#q")){ e.preventDefault(); $("#q").focus(); } });
+
+/* ---------------- boot ---------------- */
+go("archive");
+</script>
+</body>
+</html>

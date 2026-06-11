@@ -2,8 +2,8 @@
 import asyncio
 import hashlib
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from sse_starlette.sse import EventSourceResponse
 
 from archive import config, embed
@@ -67,7 +67,43 @@ def search(q: str = "", mode: str = "hybrid", kind: str = None, flagged: bool = 
 
 @app.get("/videos")
 def videos():
-    return get_store().list_videos()
+    store = get_store()
+    out = []
+    for v in store.list_videos():
+        chunks = store.chunks_for_video(v["id"])
+        flag_count = sum(len(store.flags_for_chunk(c["id"])) for c in chunks)
+        out.append({**v, "chunk_count": len(chunks),
+                    "scene_count": sum(1 for c in chunks if c["kind"] == "scene"),
+                    "transcript_count": sum(1 for c in chunks if c["kind"] == "transcript"),
+                    "flag_count": flag_count})
+    return out
+
+@app.get("/video/{video_id}")
+def video_detail(video_id: int):
+    store = get_store()
+    v = store.get_video(video_id)
+    if not v:
+        raise HTTPException(404, "video not found")
+    chunks = []
+    for c in store.chunks_for_video(video_id):
+        chunks.append({**c, "flags": store.flags_for_chunk(c["id"])})
+    return {"video": v, "chunks": chunks}
+
+@app.get("/media/{video_id}")
+def media(video_id: int):
+    v = get_store().get_video(video_id)
+    if not v or not Path(v["stored_path"]).exists():
+        raise HTTPException(404, "media not found")
+    # FileResponse는 Range 요청을 지원해 브라우저 시킹이 가능하다.
+    return FileResponse(v["stored_path"], media_type="video/mp4")
+
+@app.get("/thumb/{video_id}")
+def thumb(video_id: int):
+    frames_dir = config.data_dir() / "frames" / str(video_id)
+    frames = sorted(frames_dir.glob("*.jpg")) if frames_dir.exists() else []
+    if not frames:
+        raise HTTPException(404, "no thumbnail")
+    return FileResponse(frames[0], media_type="image/jpeg")
 
 @app.get("/progress/{video_id}")
 async def progress(video_id: int):
