@@ -54,14 +54,14 @@ def process_video(video_id, store, vector_store, data_dir: Path):
                                  seg["text"])
         chunk_rows.append((cid, seg["text"], "transcript", seg["start"], seg["end"], False))
     for i, sc in enumerate(scenes):
-        cid = store.insert_chunk(video_id, "scene", i, sc["start"], sc["end"],
+        cid = store.insert_chunk(video_id, "scene", i, sc["start_s"], sc["end_s"],
                                  sc["description"], frame_path=sc["frame_path"])
         flags = vision.real_flags(sc["flags"])
         for f in flags:
             store.add_flag(cid, f["category"], f.get("severity", "low"), f.get("note"))
         if flags:
             _emit(video_id, "vision", "info", f"금칙 감지: {flags[0]['category']}")
-        chunk_rows.append((cid, sc["description"], "scene", sc["start"], sc["end"],
+        chunk_rows.append((cid, sc["description"], "scene", sc["start_s"], sc["end_s"],
                            bool(flags)))
 
     # --- 임베딩 + 벡터 색인 ---

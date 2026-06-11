@@ -12,7 +12,8 @@ def build_explanation(matched_terms, bm25, similarity) -> dict:
     parts = []
     if has_kw:
         terms = ", ".join(f"'{t}'" for t in matched_terms) if matched_terms else "키워드"
-        parts.append(f"{terms} 일치 (FTS {bm25:.1f})")
+        bm25_disp = bm25 + 0.0 if bm25 != 0 else 0.0  # -0.0 표기 방지
+        parts.append(f"{terms} 일치 (FTS {bm25_disp:.1f})")
     if has_vec:
         parts.append(f"의미 유사도 {similarity:.2f}")
     text = " + ".join(parts) + f" → {source}"

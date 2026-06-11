@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS jobs(
   UNIQUE(video_id, step));
 
 CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
-  text, content='chunks', content_rowid='id');
+  text, content='chunks', content_rowid='id', tokenize='trigram');
 
 CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN
   INSERT INTO chunks_fts(rowid, text) VALUES (new.id, new.text);

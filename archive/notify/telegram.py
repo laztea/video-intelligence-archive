@@ -28,9 +28,15 @@ def format_results(results) -> str:
     return "\n".join(lines)
 
 def subscribe_to_events():
-    """이벤트 버스를 구독해 진행 상황을 텔레그램으로 push."""
+    """이벤트 버스를 구독해 영상 처리 '완료'만 텔레그램으로 push.
+
+    단계별 진행은 웹 프로그래스 바(SSE)로 확인하고, 텔레그램에는
+    한 영상당 완료 메시지 한 건만 보낸다 (알림 과다 방지)."""
     from archive.events import bus
-    bus.subscribe(lambda e: send_message(event_to_message(e)))
+    def on_event(e):
+        if e.step == "finalize" and e.status == "done":
+            send_message(f"✅ [영상 {e.video_id}] 처리 완료")
+    bus.subscribe(on_event)
 
 def handle_update(update, engine) -> None:
     """텔레그램 update 1건 처리. /search <쿼리> 명령이면 검색 후 응답."""

@@ -23,7 +23,7 @@ class SearchEngine:
             return self._filter(filters, limit)
         kw = self._keyword_scores(query, limit) if mode in ("keyword", "hybrid") else {}
         vec = self._vector_scores(query, limit, filters) if mode in ("vector", "hybrid") else {}
-        return self._assemble(kw, vec, mode, limit)
+        return self._assemble(kw, vec, mode, limit, query)
 
     def _keyword_scores(self, query, limit):
         if not query:
@@ -44,7 +44,7 @@ class SearchEngine:
             out[h["chunk_id"]] = {"sim": sim, "raw": sim}
         return out
 
-    def _assemble(self, kw, vec, mode, limit):
+    def _assemble(self, kw, vec, mode, limit, query=""):
         alpha = config.hybrid_alpha()
         kw_norm = _minmax({k: v["raw"] for k, v in kw.items()})
         vec_norm = _minmax({k: v["raw"] for k, v in vec.items()})
@@ -62,7 +62,7 @@ class SearchEngine:
             row = self.sql.get_chunk(cid)
             if not row:
                 continue
-            matched = self._matched_terms(row["text"], kw.get(cid))
+            matched = self._matched_terms(row["text"], query) if cid in kw else []
             expl = build_explanation(
                 matched_terms=matched,
                 bm25=kw[cid]["bm25"] if cid in kw else None,
@@ -71,10 +71,17 @@ class SearchEngine:
         results.sort(key=lambda r: r["score"], reverse=True)
         return results[:limit]
 
-    def _matched_terms(self, text, kw_entry):
-        if not kw_entry:
+    def _matched_terms(self, text, query):
+        """쿼리에서 실제로 본문에 등장하는 어구만 반환 (설명용)."""
+        if not query:
             return []
-        return [w for w in set(text.split()) if w in text]  # 단순 텀 표기
+        low = text.lower()
+        terms = [t for t in query.split() if t]
+        present = [t for t in terms if t.lower() in low]
+        # 공백 없는 단일 쿼리("무지개")가 부분일치한 경우도 표기
+        if not present and query.lower() in low:
+            present = [query]
+        return present
 
     def _filter(self, filters, limit):
         clauses, params = [], []
