@@ -1,0 +1,48 @@
+<!-- archive/web/static/index.html -->
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<title>영상 아카이브</title>
+<style>
+ body{font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem}
+ .badge{font-size:.75rem;padding:.1rem .4rem;border-radius:.3rem;color:#fff}
+ .both{background:#7c3aed}.keyword{background:#2563eb}.vector{background:#059669}
+ .filter{background:#64748b}
+ .result{border:1px solid #e2e8f0;border-radius:.5rem;padding:.8rem;margin:.5rem 0}
+ .expl{color:#64748b;font-size:.85rem;margin-top:.3rem}
+ progress{width:100%}
+</style></head><body>
+<h1>영상 아카이브 업로드</h1>
+<input type="file" id="file" accept="video/*">
+<button onclick="upload()">업로드</button>
+<progress id="bar" max="10" value="0" hidden></progress>
+<div id="status"></div>
+<hr>
+<h2>검색</h2>
+<input id="q" placeholder="자연어로 검색..." size="40">
+<select id="mode"><option>hybrid</option><option>keyword</option>
+ <option>vector</option><option>filter</option></select>
+<button onclick="search()">검색</button>
+<div id="results"></div>
+<script>
+const STEPS=["audio","transcribe","subtitle","keyframes","vision","embed","finalize"];
+async function upload(){
+ const f=document.getElementById('file').files[0]; if(!f)return;
+ const fd=new FormData(); fd.append('file',f);
+ const r=await fetch('/upload',{method:'POST',body:fd});
+ const {video_id}=await r.json();
+ const bar=document.getElementById('bar'); bar.hidden=false; bar.value=0;
+ const es=new EventSource(`/progress/${video_id}`);
+ es.onmessage=e=>{const d=JSON.parse(e.data);
+  bar.value=STEPS.indexOf(d.step)+1;
+  document.getElementById('status').textContent=`${d.step}: ${d.status} ${d.message||''}`;
+  if(d.step==='finalize'&&d.status==='done')es.close();};
+}
+async function search(){
+ const q=document.getElementById('q').value, mode=document.getElementById('mode').value;
+ const r=await fetch(`/search?q=${encodeURIComponent(q)}&mode=${mode}`);
+ const data=await r.json();
+ document.getElementById('results').innerHTML=data.map(x=>`
+  <div class="result"><span class="badge ${x.source}">${x.source}</span>
+   <b> [영상 ${x.video_id} @${x.start_s.toFixed(0)}s]</b> ${x.text}
+   <div class="expl">↳ ${x.explanation.text}</div></div>`).join('')||'결과 없음';
+}
+</script></body></html>
