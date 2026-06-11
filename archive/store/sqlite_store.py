@@ -1,6 +1,17 @@
 # archive/store/sqlite_store.py
+import re
 import sqlite3
 from pathlib import Path
+
+def _fts_query(raw: str) -> str | None:
+    """자연어/GPT 텍스트를 FTS5에 안전한 MATCH 식으로 변환.
+
+    쉼표·따옴표 등 FTS5 특수문자가 그대로 들어가면 'syntax error'가 나므로,
+    한글/영숫자 토큰만 뽑아 각각 따옴표로 감싸 OR로 결합한다."""
+    toks = re.findall(r"[0-9A-Za-z가-힣]+", raw or "")
+    if not toks:
+        return None
+    return " OR ".join(f'"{t}"' for t in toks)
 
 STEP_ORDER = ["persist", "audio", "transcribe", "subtitle", "keyframes",
               "vision", "embed", "index-sql", "index-vec", "finalize"]
@@ -101,11 +112,14 @@ class SqliteStore:
 
     # --- fts ---
     def fts_search(self, query, limit=20) -> list[dict]:
+        match = _fts_query(query)
+        if not match:
+            return []
         rows = self.conn.execute(
             "SELECT c.*, bm25(chunks_fts) AS bm25 "
             "FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid "
             "WHERE chunks_fts MATCH ? ORDER BY bm25 LIMIT ?",
-            (query, limit)).fetchall()
+            (match, limit)).fetchall()
         return [dict(r) for r in rows]
 
     # --- flags ---
