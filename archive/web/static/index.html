@@ -50,9 +50,17 @@ header{
   border-bottom:1px solid var(--line);
 }
 .bar{
-  max-width:1180px; margin:0 auto; padding:18px 28px;
-  display:grid; grid-template-columns:auto 1fr auto; gap:24px; align-items:center;
+  max-width:1180px; margin:0 auto; padding:18px 28px 0;
+  display:flex; align-items:center; gap:22px;
 }
+.nav{display:flex; gap:4px}
+.nav button{
+  padding:8px 15px; border:none; background:transparent; color:var(--muted);
+  font-size:13.5px; font-weight:500; border-radius:9px; transition:.15s; font-family:inherit;
+}
+.nav button:hover{color:var(--ink)}
+.nav button.on{color:var(--amber); background:rgba(230,167,63,.1)}
+.searchrow{max-width:1180px; margin:0 auto; padding:15px 28px 14px}
 .brand{display:flex; align-items:baseline; gap:11px; cursor:pointer; user-select:none}
 .brand .mark{
   font-family:"Fraunces",serif; font-weight:900; font-size:27px; letter-spacing:-.02em;
@@ -80,7 +88,7 @@ kbd{
   border:1px solid var(--line2); border-radius:5px; padding:2px 6px; background:var(--bg2);
 }
 .upbtn{
-  display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+  display:inline-flex; align-items:center; gap:8px; white-space:nowrap; margin-left:auto;
   padding:12px 18px; border-radius:11px; border:1px solid var(--amber-dim);
   background:linear-gradient(180deg, rgba(230,167,63,.16), rgba(230,167,63,.06));
   color:var(--amber); font-weight:600; font-size:14px; transition:.16s transform,.16s background;
@@ -277,13 +285,55 @@ main{max-width:1180px; margin:0 auto; padding:30px 28px 90px}
 .toast.err{border-left-color:var(--flag)}
 .toast b{font-family:"Fraunces",serif}
 
+/* ---------- DB view ---------- */
+.dbintro{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:18px 22px; margin-bottom:30px; font-size:14px; color:var(--muted); line-height:1.65;
+}
+.dbintro b{color:var(--ink)}
+.dbintro .tag{font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--amber);
+  border:1px solid var(--amber-dim); border-radius:6px; padding:2px 8px; margin-right:6px}
+.dbintro .tag.vec{color:var(--rose); border-color:var(--rose-dim)}
+.erd{display:grid; grid-template-columns:repeat(auto-fit,minmax(228px,1fr)); gap:16px; margin-bottom:18px}
+.schemacard{background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden; animation:rise .4s both}
+.schemahd{display:flex; justify-content:space-between; align-items:center; padding:11px 15px;
+  background:var(--surface2); border-bottom:1px solid var(--line); font-family:"JetBrains Mono",monospace}
+.schemahd b{color:var(--amber); font-size:14px} .schemahd span{font-size:11px; color:var(--faint)}
+.cols{padding:7px 0}
+.col{display:flex; justify-content:space-between; gap:12px; padding:5px 15px;
+  font-family:"JetBrains Mono",monospace; font-size:12px}
+.col.pk{background:rgba(230,167,63,.05)}
+.col .cn{color:var(--ink)} .col .ct{color:var(--faint); white-space:nowrap}
+.rels{background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:16px 20px; margin-bottom:8px}
+.relhd{font-family:"JetBrains Mono",monospace; font-size:11px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--faint); margin-bottom:13px}
+.rel{display:flex; align-items:center; gap:10px; padding:6px 0; font-family:"JetBrains Mono",monospace;
+  font-size:12.5px; flex-wrap:wrap}
+.rel code{color:var(--teal); background:rgba(95,184,168,.08); padding:2px 8px; border-radius:5px}
+.rel .arrow{color:var(--amber); font-weight:700}
+.rel .rlabel{color:var(--muted); font-family:"Spline Sans",sans-serif; font-size:12.5px}
+.rel.vec code{color:var(--rose); background:rgba(217,138,166,.08)}
+.tabbar{display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap}
+.dtab{padding:8px 14px; border:1px solid var(--line); background:var(--bg2); color:var(--muted);
+  border-radius:9px; font-family:"JetBrains Mono",monospace; font-size:12px; transition:.15s}
+.dtab:hover{color:var(--ink)}
+.dtab.on{color:var(--amber); border-color:var(--amber-dim); background:rgba(230,167,63,.08)}
+.datawrap{overflow:auto; border:1px solid var(--line); border-radius:12px; max-height:70vh}
+.dgrid{border-collapse:collapse; width:100%; font-family:"JetBrains Mono",monospace; font-size:12px}
+.dgrid th{position:sticky; top:0; background:var(--surface2); color:var(--amber); text-align:left;
+  padding:10px 13px; border-bottom:1px solid var(--line2); white-space:nowrap; z-index:1}
+.dgrid td{padding:8px 13px; border-bottom:1px solid var(--line); color:var(--ink);
+  white-space:nowrap; max-width:360px; overflow:hidden; text-overflow:ellipsis}
+.dgrid tr:hover td{background:var(--surface)}
+
 @keyframes rise{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes blink{50%{opacity:.3}}
 .hidden{display:none!important}
 @media(max-width:820px){
-  .bar{grid-template-columns:1fr auto; gap:14px} .searchwrap{grid-column:1/-1; order:3}
+  .bar{flex-wrap:wrap; gap:12px}
   .detail{grid-template-columns:1fr} .player{position:static}
+  .erd{grid-template-columns:1fr}
   kbd{display:none}
 }
 </style>
@@ -295,15 +345,21 @@ main{max-width:1180px; margin:0 auto; padding:30px 28px 90px}
       <span class="mark">아카이브<em>.</em></span>
       <span class="sub">video&nbsp;intelligence</span>
     </div>
+    <nav class="nav" id="nav">
+      <button data-view="archive" class="on">아카이브</button>
+      <button data-view="db">DB 뷰</button>
+    </nav>
+    <button class="upbtn" onclick="document.getElementById('file').click()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V6m0 0-6 6m6-6 6 6"/></svg>
+      업로드
+    </button>
+  </div>
+  <div class="searchrow">
     <div class="searchwrap">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
       <input id="q" placeholder="자연어로 검색…  예: 무지개색 테스트 패턴이 나오는 장면" autocomplete="off">
       <kbd>/</kbd>
     </div>
-    <button class="upbtn" onclick="document.getElementById('file').click()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V6m0 0-6 6m6-6 6 6"/></svg>
-      업로드
-    </button>
   </div>
   <div class="controls" id="searchControls">
     <div class="pills" id="modePills">
@@ -342,9 +398,12 @@ const esc = t => (t||"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;
 function go(view, arg){
   state.view = view;
   $("#searchControls").classList.toggle("hidden", view!=="search" && view!=="archive");
+  const navFor = (view==="db") ? "db" : "archive";  // search/detail highlight 아카이브
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on", b.dataset.view===navFor));
   if(view==="archive") renderArchive();
   else if(view==="search") runSearch();
   else if(view==="detail") renderDetail(arg);
+  else if(view==="db") renderDB();
 }
 
 /* ---------------- archive ---------------- */
@@ -484,6 +543,65 @@ function segHTML(c){
 function seekVid(t){ const v=$("#vid"); if(v){ v.currentTime=t; v.play().catch(()=>{}); window.scrollTo({top:0,behavior:"smooth"}); } }
 function openAt(id,t){ state._seek=t; go("detail",id); }
 
+/* ---------------- DB view ---------------- */
+async function renderDB(){
+  main.innerHTML = `
+    <div class="eyebrow">데이터베이스 구조 · <b>이중 저장소</b></div>
+    <div class="dbintro">
+      <span class="tag">SQLite</span><span class="tag">FTS5</span><span class="tag vec">ChromaDB</span><br><br>
+      관계형 데이터(영상·청크·금칙·작업)는 <b>SQLite</b>에 정규화해 저장하고, 전문검색은
+      <b>FTS5</b> 가상 테이블(<code>chunks_fts</code>, trigram)이 담당합니다. 의미 검색용 임베딩 벡터는
+      별도의 <b>ChromaDB</b> 컬렉션에 청크 id로 연결되어 영속됩니다. 아래는 실제 스키마와 데이터입니다.
+    </div>
+    <div id="erd"><div class="spinner"></div></div>
+    <div class="eyebrow" style="margin-top:38px">테이블 데이터 · <b>실시간</b></div>
+    <div class="tabbar" id="dbtabs"></div>
+    <div id="dbdata"><div class="spinner"></div></div>`;
+  let schema=[];
+  try{ schema = await (await fetch("/db/schema")).json(); }catch(e){}
+  const erd=$("#erd"); erd.className="erd";
+  erd.innerHTML = schema.map((t,i)=>schemaCard(t,i)).join("") + relsHTML();
+  $("#dbtabs").innerHTML = schema.map((t,i)=>
+    `<button class="dtab ${i===0?'on':''}" data-t="${t.name}">${t.name} · ${t.count}</button>`).join("");
+  $("#dbtabs").addEventListener("click",e=>{
+    const b=e.target.closest(".dtab"); if(!b)return;
+    document.querySelectorAll(".dtab").forEach(x=>x.classList.remove("on")); b.classList.add("on");
+    loadTable(b.dataset.t);
+  });
+  if(schema[0]) loadTable(schema[0].name);
+}
+function schemaCard(t,i){
+  return `<div class="schemacard" style="animation-delay:${i*50}ms">
+    <div class="schemahd"><b>${t.name}</b><span>${t.count} rows</span></div>
+    <div class="cols">${t.columns.map(c=>`<div class="col ${c.pk?'pk':''}">
+      <span class="cn">${c.pk?'🔑 ':''}${esc(c.name)}</span><span class="ct">${esc(c.type||'')}</span></div>`).join("")}</div>
+  </div>`;
+}
+function relsHTML(){
+  const rels=[
+    ["videos.id","chunks.video_id","1:N · 한 영상이 여러 청크(자막·장면)로 분해"],
+    ["chunks.id","chunk_flags.chunk_id","1:N · 한 청크에 여러 금칙 태그"],
+    ["videos.id","jobs.video_id","1:N · 영상별 파이프라인 단계 체크포인트"],
+    ["chunks.id","chunks_fts.rowid","1:1 · FTS5 전문검색 그림자 테이블"],
+  ];
+  return `<div class="rels"><div class="relhd">관계 (논리적 외래키)</div>
+    ${rels.map(r=>`<div class="rel"><code>${r[0]}</code><span class="arrow">→</span><code>${r[1]}</code><span class="rlabel">${r[2]}</span></div>`).join("")}
+    <div class="rel vec"><code>chunks.id</code><span class="arrow">⇒</span><code>ChromaDB · chunks 컬렉션</code><span class="rlabel">청크 임베딩 벡터 (의미 검색)</span></div>
+  </div>`;
+}
+async function loadTable(name){
+  const box=$("#dbdata"); box.innerHTML='<div class="spinner"></div>';
+  let d;
+  try{ d=await (await fetch("/db/table/"+name+"?limit=100")).json(); }
+  catch(e){ box.innerHTML="<div class='empty'><p>불러올 수 없음</p></div>"; return; }
+  if(!d.rows.length){ box.innerHTML="<div class='empty'><p>행이 없습니다.</p></div>"; return; }
+  box.innerHTML = `<div class="datawrap"><table class="dgrid">
+    <thead><tr>${d.columns.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead>
+    <tbody>${d.rows.map(r=>`<tr>${r.map(v=>`<td title="${esc(String(v??''))}">${esc(cell(v))}</td>`).join("")}</tr>`).join("")}</tbody>
+  </table></div>`;
+}
+function cell(v){ if(v==null) return "·"; const s=String(v); return s.length>90? s.slice(0,90)+"…" : s; }
+
 /* ---------------- upload ---------------- */
 const liveUploads = []; // {el}
 function wireDropzone(){
@@ -540,6 +658,11 @@ function toast(html,err){
 }
 
 /* ---------------- wire controls ---------------- */
+$("#nav").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  if(b.dataset.view==="archive") $("#q").value="";
+  go(b.dataset.view);
+});
 $("#q").addEventListener("input",debouncedSearch);
 $("#q").addEventListener("keydown",e=>{ if(e.key==="Enter"){clearTimeout(searchTimer); go("search");} if(e.key==="Escape"){e.target.value="";go("archive");} });
 $("#modePills").addEventListener("click",e=>{

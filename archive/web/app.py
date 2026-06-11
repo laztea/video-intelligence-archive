@@ -97,6 +97,17 @@ def media(video_id: int):
     # FileResponse는 Range 요청을 지원해 브라우저 시킹이 가능하다.
     return FileResponse(v["stored_path"], media_type="video/mp4")
 
+@app.get("/db/schema")
+def db_schema():
+    return get_store().schema()
+
+@app.get("/db/table/{name}")
+def db_table(name: str, limit: int = 100):
+    try:
+        return get_store().table_rows(name, limit)
+    except ValueError:
+        raise HTTPException(404, "unknown table")
+
 @app.get("/thumb/{video_id}")
 def thumb(video_id: int):
     frames_dir = config.data_dir() / "frames" / str(video_id)

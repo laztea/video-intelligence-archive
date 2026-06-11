@@ -3,15 +3,9 @@ import re
 import sqlite3
 from pathlib import Path
 
-def _fts_query(raw: str) -> str | None:
-    """자연어/GPT 텍스트를 FTS5에 안전한 MATCH 식으로 변환.
-
-    쉼표·따옴표 등 FTS5 특수문자가 그대로 들어가면 'syntax error'가 나므로,
-    한글/영숫자 토큰만 뽑아 각각 따옴표로 감싸 OR로 결합한다."""
-    toks = re.findall(r"[0-9A-Za-z가-힣]+", raw or "")
-    if not toks:
-        return None
-    return " OR ".join(f'"{t}"' for t in toks)
+def _tokens(raw: str) -> list[str]:
+    """자연어/GPT 텍스트에서 한글/영숫자 토큰만 추출 (FTS 특수문자 제거)."""
+    return re.findall(r"[0-9A-Za-z가-힣]+", raw or "")
 
 STEP_ORDER = ["persist", "audio", "transcribe", "subtitle", "keyframes",
               "vision", "embed", "index-sql", "index-vec", "finalize"]
@@ -112,15 +106,51 @@ class SqliteStore:
 
     # --- fts ---
     def fts_search(self, query, limit=20) -> list[dict]:
-        match = _fts_query(query)
-        if not match:
+        toks = _tokens(query)
+        if not toks:
             return []
-        rows = self.conn.execute(
-            "SELECT c.*, bm25(chunks_fts) AS bm25 "
-            "FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid "
-            "WHERE chunks_fts MATCH ? ORDER BY bm25 LIMIT ?",
-            (match, limit)).fetchall()
-        return [dict(r) for r in rows]
+        long_toks = [t for t in toks if len(t) >= 3]
+        short_toks = [t for t in toks if len(t) < 3]
+        out = {}  # id -> row (insertion order: FTS hits first)
+        if long_toks:
+            match = " OR ".join(f'"{t}"' for t in long_toks)
+            for r in self.conn.execute(
+                "SELECT c.*, bm25(chunks_fts) AS bm25 "
+                "FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid "
+                "WHERE chunks_fts MATCH ? ORDER BY bm25 LIMIT ?",
+                (match, limit)).fetchall():
+                out[r["id"]] = dict(r)
+        # 1~2글자 토큰은 trigram이 색인하지 못하므로 LIKE 부분일치로 보완
+        for t in short_toks:
+            for r in self.conn.execute(
+                "SELECT *, 0.0 AS bm25 FROM chunks WHERE text LIKE ? LIMIT ?",
+                (f"%{t}%", limit)).fetchall():
+                out.setdefault(r["id"], dict(r))
+        return list(out.values())[:limit]
+
+    # --- DB introspection (DB 뷰 페이지용) ---
+    SAFE_TABLES = ("videos", "chunks", "chunk_flags", "jobs")
+
+    def schema(self) -> list[dict]:
+        out = []
+        for name in self.SAFE_TABLES:
+            cols = [{"name": r["name"], "type": r["type"],
+                     "pk": bool(r["pk"]), "notnull": bool(r["notnull"])}
+                    for r in self.conn.execute(f"PRAGMA table_info({name})").fetchall()]
+            count = self.conn.execute(f"SELECT COUNT(*) AS n FROM {name}").fetchone()["n"]
+            ddl = self.conn.execute(
+                "SELECT sql FROM sqlite_master WHERE name=?", (name,)).fetchone()
+            out.append({"name": name, "columns": cols, "count": count,
+                        "sql": ddl["sql"] if ddl else ""})
+        return out
+
+    def table_rows(self, name, limit=100) -> dict:
+        if name not in self.SAFE_TABLES:
+            raise ValueError("unknown table")
+        cur = self.conn.execute(f"SELECT * FROM {name} ORDER BY id DESC LIMIT ?", (limit,))
+        cols = [d[0] for d in cur.description]
+        rows = [list(r) for r in cur.fetchall()]
+        return {"columns": cols, "rows": rows}
 
     # --- flags ---
     def add_flag(self, chunk_id, category, severity, note=None):
