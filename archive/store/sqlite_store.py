@@ -1,6 +1,7 @@
 # archive/store/sqlite_store.py
 import re
 import sqlite3
+import threading
 from pathlib import Path
 
 def _tokens(raw: str) -> list[str]:
@@ -42,13 +43,35 @@ END;
 
 class SqliteStore:
     def __init__(self, path: Path):
-        self.conn = sqlite3.connect(str(path), check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
-        self.conn.executescript(SCHEMA)
-        self.conn.commit()
+        self.path = str(path)
+        self._local = threading.local()
+        # 스키마 초기화 (idempotent)
+        c = self._new_conn()
+        c.executescript(SCHEMA)
+        c.commit()
+
+    def _new_conn(self):
+        c = sqlite3.connect(self.path, check_same_thread=False, timeout=30)
+        c.row_factory = sqlite3.Row
+        c.execute("PRAGMA journal_mode=WAL")     # 동시 읽기/쓰기 허용
+        c.execute("PRAGMA busy_timeout=30000")
+        return c
+
+    @property
+    def conn(self):
+        """스레드별 커넥션. 하나의 커넥션을 여러 스레드가 공유하면
+        segfault가 나므로 스레드 로컬로 분리한다."""
+        c = getattr(self._local, "conn", None)
+        if c is None:
+            c = self._new_conn()
+            self._local.conn = c
+        return c
 
     def close(self):
-        self.conn.close()
+        c = getattr(self._local, "conn", None)
+        if c is not None:
+            c.close()
+            self._local.conn = None
 
     # --- videos ---
     def insert_video(self, filename, stored_path, sha256) -> int:

@@ -1,5 +1,7 @@
 .env
 data/
+eval/report.html
+eval/results.json
 __pycache__/
 *.pyc
 .venv/

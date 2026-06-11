@@ -42,6 +42,16 @@ def schedule_processing(video_id):
 def index():
     return (STATIC / "index.html").read_text(encoding="utf-8")
 
+@app.get("/eval", response_class=HTMLResponse)
+def eval_report():
+    rp = Path(__file__).resolve().parent.parent.parent / "eval" / "report.html"
+    if not rp.exists():
+        return HTMLResponse(
+            "<body style='font-family:system-ui;background:#14110d;color:#ece3d4;"
+            "padding:60px;text-align:center'><h2>평가 리포트가 아직 없습니다</h2>"
+            "<p><code>python eval/run_eval.py</code> 실행 후 새로고침하세요.</p></body>")
+    return rp.read_text(encoding="utf-8")
+
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
     data = await file.read()

@@ -60,6 +60,9 @@ header{
 }
 .nav button:hover{color:var(--ink)}
 .nav button.on{color:var(--amber); background:rgba(230,167,63,.1)}
+.navlink{padding:8px 15px; color:var(--muted); font-size:13.5px; font-weight:500;
+  border-radius:9px; text-decoration:none; transition:.15s}
+.navlink:hover{color:var(--teal)}
 .searchrow{max-width:1180px; margin:0 auto; padding:15px 28px 14px}
 .brand{display:flex; align-items:baseline; gap:11px; cursor:pointer; user-select:none}
 .brand .mark{
@@ -363,6 +366,7 @@ main{max-width:1180px; margin:0 auto; padding:30px 28px 90px}
     <nav class="nav" id="nav">
       <button data-view="archive" class="on">아카이브</button>
       <button data-view="db">DB 뷰</button>
+      <a class="navlink" href="/eval" target="_blank" rel="noopener">평가 ↗</a>
     </nav>
     <button class="upbtn" onclick="document.getElementById('file').click()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V6m0 0-6 6m6-6 6 6"/></svg>
