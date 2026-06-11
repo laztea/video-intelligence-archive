@@ -45,7 +45,7 @@ def process_video(video_id, store, vector_store, data_dir: Path):
                        threshold=0.3)) or []
 
     scenes = _step(store, video_id, "vision",
-                   lambda: _analyze_frames(frames)) or []
+                   lambda: _analyze_frames(frames, segments)) or []
 
     # --- 청크 적재 (존재하는 것만; 제약③) ---
     chunk_rows = []
@@ -107,13 +107,23 @@ def _summary(store, video_id) -> str:
     lines.append("• 🔎 이제 검색 가능합니다")
     return "\n".join(lines)
 
-def _analyze_frames(frames):
+def _dialogue_around(segments, t, window=6.0):
+    """프레임 시각 t 전후 window초의 대사를 모아 Vision 맥락으로 제공."""
+    lines = [s["text"] for s in (segments or [])
+             if s.get("start", 0) <= t + window and s.get("end", 0) >= t - window]
+    return " ".join(x.strip() for x in lines if x).strip()[:500]
+
+def _analyze_frames(frames, segments=None):
     out = []
-    for i, frame in enumerate(frames):
-        res = vision.analyze_frame(frame)
+    n = len(frames)
+    for i, fr in enumerate(frames):
+        t = fr["t"]
+        nxt = frames[i + 1]["t"] if i + 1 < n else t + 3.0
+        context = _dialogue_around(segments, t)
+        res = vision.analyze_frame(fr["path"], context=context)
         out.append({"description": res["description"], "flags": res.get("flags", []),
-                    "start_s": float(i), "end_s": float(i) + 1.0,
-                    "frame_path": str(frame)})
+                    "start_s": t, "end_s": max(nxt, t + 0.5),
+                    "frame_path": str(fr["path"])})
     return out
 
 def resume_incomplete(store, vector_store, data_dir: Path):

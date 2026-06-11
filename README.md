@@ -11,7 +11,7 @@
 
 ## 핵심 기능
 
-- **멀티모달 색인 파이프라인** — Whisper STT → GPT 자막 교정 → ffmpeg 장면(keyframe) 추출 → GPT Vision 장면 분석·금칙 태깅 → 임베딩
+- **멀티모달 색인 파이프라인** — Whisper STT → GPT 자막 교정 → ffmpeg 장면(keyframe) 추출 → GPT Vision 장면 분석·금칙 태깅(**전후 대사 맥락 융합**) → 임베딩
 - **이중 저장소** — SQLite(정규화 + FTS5 전문검색) + ChromaDB(영속 벡터)
 - **하이브리드 검색 4모드** — `hybrid` · `keyword` · `vector` · `filter`, 점수 합산
 - **설명 가능한 검색** — 결과마다 출처 배지 + "왜 나왔는지" 결정론적 설명
@@ -121,10 +121,17 @@ docs/                    # 설계 스펙 · 구현 계획 · 런북
 
 Python · FastAPI · ChromaDB · SQLite(FTS5) · OpenAI(GPT-5.5 / Whisper / text-embedding-3-small) · ffmpeg · SSE · 바닐라 JS
 
+## 장면 이해 — 대사 맥락 융합
+
+단일 keyframe(클로즈업)만 보면 학교/사무실 같은 실내 장소가 구분되지 않습니다. 그래서 Vision
+호출 시 **그 시점 전후의 대사(자막)를 함께 투입**해, 이미지만으로 모호한 장소·상황·관계를 대사로
+추론하게 합니다(근거 없으면 단정하지 않음). keyframe 타임스탬프는 ffmpeg `showinfo`의 실제
+`pts_time`을 사용해 대사와 정렬하고, UI 시킹도 실제 시각으로 동작합니다.
+
 ## 알려진 한계
 
 - keyword 단독 모드는 한글 2글자 미만 단어와 유의어를 못 잡습니다 → `hybrid`/`vector`가 보완(기본값 hybrid)
-- 장면 타임스탬프는 keyframe 인덱스 기반의 근사치입니다(자막은 Whisper 실제 시각)
+- 무음/배경음 구간에서 Whisper가 환각 자막(예: "ご視聴ありがとうございました")을 만들 수 있어, 대사 맥락이 빈약하거나 오염될 수 있습니다
 
 ---
 
